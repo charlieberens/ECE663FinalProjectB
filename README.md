@@ -24,7 +24,7 @@ NOTE: Currently buggy and broken. I will fix.
 The watermark is embedded in the last n bits of each pixel. `n` is specified by the `--masking-args` argument.
 
 #### BitwiseA
-The encoder takes the full image as input. Zeros out the last n bits. Then learns a number between 0 and 1 indicating how large the last few bits should be. 0 corresponds to xxxx0000. 1 corresponds to xxxx1111. There's everything else in between. 
+The encoder takes the full image as input, zeros out the last n bits, then learns a number between 0 and 1 indicating how large the last few bits should be. 0 corresponds to xxxx0000. 1 corresponds to xxxx1111. There's everything else in between. 
 
 This does not work particularly well.
 
@@ -32,4 +32,4 @@ This does not work particularly well.
 The encoder takes the last n bits as input, and outputs a number between 0 and 1 that is similarly converted to n bits. This works much better.
 
 #### BitwiseC
-This is the same as bitwise C but durring the "after concat layer", the model additionally has access to the original image.
+This is the same as bitwiseB but durring the "after concat layer", the model additionally has access to the original image.
