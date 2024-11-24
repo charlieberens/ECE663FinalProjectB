@@ -93,11 +93,19 @@ def main():
             start_epoch=start_epoch,
             experiment_name=args.name)
         
-        watermark_mask, hash_mask = create_mask(
-            H=args.size,
-            W=args.size,
-            args=args.masking_args
-        )
+        if args.hash_mode == "alternate":
+            watermark_mask, hash_mask = create_mask(
+                H=args.size,
+                W=args.size,
+                args=args.masking_args
+            )
+        else:
+            watermark_mask = torch.ones(
+                (3,args.size, args.size)
+            )
+            hash_mask = torch.ones(
+                (3, args.size, args.size)
+            )
 
         noise_config = args.noise if args.noise is not None else []
         hidden_config = HiDDenConfiguration(H=args.size, W=args.size,
@@ -121,6 +129,8 @@ def main():
             pickle.dump(train_options, f)
             pickle.dump(noise_config, f)
             pickle.dump(hidden_config, f)
+
+        # torch.autograd.set_detect_anomaly(True)
 
 
     logging.basicConfig(level=logging.INFO,

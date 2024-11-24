@@ -7,6 +7,19 @@ SigningDemo
  └─── HiDDeN
 ```
 
+## CLIP
+```
+pip install git+https://github.com/openai/CLIP.git
+```
+(If you create from `environment.yml` you might be set).
+
+`CLIP/main.py` doesn't work yet. Do fix.
+
+TODO:
+* Explore how much the CLIP embedding changes under gaussian noise (simulating HiDDeN purturbations) and JPEG compression.
+* Possibly do dimensionality reduction on the CLIP embedding, and explore the same thing in the lower dimensional space.
+
+
 ## Encoding Methods
 ### Alternate
 The watermark is embedded in every nth pixel of the image. `n` is specified by the `--masking-args` argument.
@@ -33,3 +46,4 @@ The encoder takes the last n bits as input, and outputs a number between 0 and 1
 
 #### BitwiseC
 This is the same as bitwiseB but durring the "after concat layer", the model additionally has access to the original image.
+

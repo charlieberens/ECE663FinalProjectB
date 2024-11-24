@@ -1,9 +1,9 @@
+import math
 import torch
 import torch.nn as nn
 from options import HiDDenConfiguration
 from model.conv_bn_relu import ConvBNRelu
-from torchvision import datasets, transforms
-
+from torchvision import transforms
 
 class Encoder(nn.Module):
     """
@@ -144,8 +144,16 @@ class BitwiseEncoder2(nn.Module):
         self.bit_change_temp = 10
         self.include_image = include_image
 
+        # We take the bits to be uniformly distributed on the interval. Therefore, their mean should be .5, and their standard deviation should be sqrt((b-a)^2/12) = (sqrt(1/12))
+        root_one_twelveth = 1/math.sqrt(12)
+
         self.bit_norm = transforms.Normalize(
-            [0.5 * 1/self.int_rounding_factor, 0.5 * 1/self.int_rounding_factor, 0.5 * 1/self.int_rounding_factor], [0.5 * 1/self.int_rounding_factor, 0.5 * 1/self.int_rounding_factor, 0.5 * 1/self.int_rounding_factor]
+            [.5, .5, .5],
+            [root_one_twelveth, root_one_twelveth, root_one_twelveth]
+        )
+        self.undo_bit_norm = transforms.Normalize(
+            [-.5, -.5, -.5],
+            [1/root_one_twelveth, 1/root_one_twelveth, 1/root_one_twelveth]
         )
         self.img_norm = transforms.Normalize(
             [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
@@ -159,9 +167,8 @@ class BitwiseEncoder2(nn.Module):
 
         if self.include_image:
             normed_image = self.img_norm(image)
-        # image = self.norm(pre_norm_image)
 
-        # last_few_bits = self.bit_norm(last_few_bits)
+        last_few_bits = self.bit_norm(last_few_bits)
 
         # First, add two dummy dimensions in the end of the message.
         # This is required for the .expand to work correctly

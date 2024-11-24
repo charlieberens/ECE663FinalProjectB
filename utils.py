@@ -131,10 +131,12 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
         # If we are doing bitwise transformations, normalization needs to happen after rounding
         data_transforms = {
             'train': transforms.Compose([
+                transforms.Resize(hidden_config.W),
                 transforms.RandomCrop((hidden_config.H, hidden_config.W), pad_if_needed=True),
                 transforms.ToTensor(),
             ]),
             'test': transforms.Compose([
+                transforms.Resize(hidden_config.W),
                 transforms.CenterCrop((hidden_config.H, hidden_config.W)),
                 transforms.ToTensor(),
             ])
@@ -142,11 +144,13 @@ def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: Training
     else:
         data_transforms = {
             'train': transforms.Compose([
+                transforms.Resize(hidden_config.W),
                 transforms.RandomCrop((hidden_config.H, hidden_config.W), pad_if_needed=True),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
             ]),
             'test': transforms.Compose([
+                transforms.Resize(hidden_config.W),
                 transforms.CenterCrop((hidden_config.H, hidden_config.W)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
