@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from options import HiDDenConfiguration, TrainingOptions
 from model.hidden import Hidden
+from datasets import load_dataset
 
 
 def image_to_tensor(image):
@@ -53,8 +54,12 @@ def save_images(original_images, watermarked_images, epoch, folder, resize_to=No
         watermarked_images = F.interpolate(watermarked_images, size=resize_to)
 
     stacked_images = torch.cat([images, watermarked_images], dim=0)
-    filename = os.path.join(folder, 'epoch-{}.png'.format(epoch))
-    torchvision.utils.save_image(stacked_images, filename, original_images.shape[0], normalize=False)
+    filename = os.path.join(folder, f'epoch-{epoch}.png')
+    torchvision.utils.save_image(
+        stacked_images,
+        filename,
+        normalize=False
+    )
 
 
 def sorted_nicely(l):
@@ -122,18 +127,31 @@ def load_options(options_file_name) -> (TrainingOptions, HiDDenConfiguration, di
 def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: TrainingOptions):
     """ Get torch data loaders for training and validation. The data loaders take a crop of the image,
     transform it into tensor, and normalize it."""
-    data_transforms = {
-        'train': transforms.Compose([
-            transforms.RandomCrop((hidden_config.H, hidden_config.W), pad_if_needed=True),
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-        ]),
-        'test': transforms.Compose([
-            transforms.CenterCrop((hidden_config.H, hidden_config.W)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-        ])
-    }
+    if hidden_config.hash_mode=="bitwise":
+        # If we are doing bitwise transformations, normalization needs to happen after rounding
+        data_transforms = {
+            'train': transforms.Compose([
+                transforms.RandomCrop((hidden_config.H, hidden_config.W), pad_if_needed=True),
+                transforms.ToTensor(),
+            ]),
+            'test': transforms.Compose([
+                transforms.CenterCrop((hidden_config.H, hidden_config.W)),
+                transforms.ToTensor(),
+            ])
+        }
+    else:
+        data_transforms = {
+            'train': transforms.Compose([
+                transforms.RandomCrop((hidden_config.H, hidden_config.W), pad_if_needed=True),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+            ]),
+            'test': transforms.Compose([
+                transforms.CenterCrop((hidden_config.H, hidden_config.W)),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+            ])
+        }
 
     train_images = datasets.ImageFolder(train_options.train_folder, data_transforms['train'])
     train_loader = torch.utils.data.DataLoader(train_images, batch_size=train_options.batch_size, shuffle=True,

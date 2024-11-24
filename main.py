@@ -3,6 +3,7 @@ import pprint
 import argparse
 import torch
 import pickle
+from crypto_addition import create_mask
 import utils
 import logging
 import sys
@@ -21,8 +22,8 @@ def main():
     parent_parser = argparse.ArgumentParser(description='Training of HiDDeN nets')
     subparsers = parent_parser.add_subparsers(dest='command', help='Sub-parser for commands')
     new_run_parser = subparsers.add_parser('new', help='starts a new run')
-    new_run_parser.add_argument('--data-dir', '-d', required=True, type=str,
-                                help='The directory where the data is stored.')
+    new_run_parser.add_argument('--data-dir', '-d', type=str,
+                                help='The directory where the data is stored. If none, defaults to midjourney remote.')
     new_run_parser.add_argument('--batch-size', '-b', required=True, type=int, help='The batch size.')
     new_run_parser.add_argument('--epochs', '-e', default=300, type=int, help='Number of epochs to run the simulation.')
     new_run_parser.add_argument('--name', required=True, type=str, help='The name of the experiment.')
@@ -41,6 +42,10 @@ def main():
 
     new_run_parser.add_argument('--noise', nargs='*', action=NoiseArgParser,
                                 help="Noise layers configuration. Use quotes when specifying configuration, e.g. 'cropout((0.55, 0.6), (0.55, 0.6))'")
+    new_run_parser.add_argument('--masking-args', required=True, type=str,
+                            help='Arbitrary masking-args.')
+    new_run_parser.add_argument('--hash-mode', required=True, type=str,
+                            help='bitwise or alternate.')
 
     new_run_parser.set_defaults(tensorboard=False)
     new_run_parser.set_defaults(enable_fp16=False)
@@ -55,6 +60,7 @@ def main():
     # continue_parser.add_argument('--tensorboard', action='store_true',
     #                             help='Override the previous setting regarding tensorboard logging.')
 
+
     args = parent_parser.parse_args()
     checkpoint = None
     loaded_checkpoint_file_name = None
@@ -66,8 +72,8 @@ def main():
         checkpoint, loaded_checkpoint_file_name = utils.load_last_checkpoint(os.path.join(this_run_folder, 'checkpoints'))
         train_options.start_epoch = checkpoint['epoch'] + 1
         if args.data_dir is not None:
-            train_options.train_folder = os.path.join(args.data_dir, 'train')
-            train_options.validation_folder = os.path.join(args.data_dir, 'val')
+            train_options.train_folder = os.path.join(args.data_dir, 'train2017')
+            train_options.validation_folder = os.path.join(args.data_dir, 'val2017')
         if args.epochs is not None:
             if train_options.start_epoch < args.epochs:
                 train_options.number_of_epochs = args.epochs
@@ -75,18 +81,23 @@ def main():
                 print(f'Command-line specifies of number of epochs = {args.epochs}, but folder={args.folder} '
                       f'already contains checkpoint for epoch = {train_options.start_epoch}.')
                 exit(1)
-
     else:
         assert args.command == 'new'
         start_epoch = 1
         train_options = TrainingOptions(
             batch_size=args.batch_size,
             number_of_epochs=args.epochs,
-            train_folder=os.path.join(args.data_dir, 'train'),
-            validation_folder=os.path.join(args.data_dir, 'val'),
+            train_folder=(os.path.join(args.data_dir, 'train') if args.data_dir else None),
+            validation_folder=(os.path.join(args.data_dir, 'val') if args.data_dir else None),
             runs_folder=os.path.join('.', 'runs'),
             start_epoch=start_epoch,
             experiment_name=args.name)
+        
+        watermark_mask, hash_mask = create_mask(
+            H=args.size,
+            W=args.size,
+            args=args.masking_args
+        )
 
         noise_config = args.noise if args.noise is not None else []
         hidden_config = HiDDenConfiguration(H=args.size, W=args.size,
@@ -99,7 +110,10 @@ def main():
                                             decoder_loss=1,
                                             encoder_loss=0.7,
                                             adversarial_loss=1e-3,
-                                            enable_fp16=args.enable_fp16
+                                            enable_fp16=args.enable_fp16,
+                                            mask=watermark_mask,
+                                            hash_mode=args.hash_mode,
+                                            masking_args=args.masking_args
                                             )
 
         this_run_folder = utils.create_folder_for_run(train_options.runs_folder, args.name)

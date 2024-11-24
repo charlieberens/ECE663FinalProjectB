@@ -1,6 +1,6 @@
 import torch.nn as nn
-from model.encoder import Encoder
-from model.decoder import Decoder
+from model.encoder import BitwiseEncoder, BitwiseEncoder2, Encoder
+from model.decoder import BitwiseDecoder, Decoder
 from options import HiDDenConfiguration
 from noise_layers.noiser import Noiser
 
@@ -16,10 +16,19 @@ class EncoderDecoder(nn.Module):
     def __init__(self, config: HiDDenConfiguration, noiser: Noiser):
 
         super(EncoderDecoder, self).__init__()
-        self.encoder = Encoder(config)
-        self.noiser = noiser
 
-        self.decoder = Decoder(config)
+        if config.hash_mode == "bitwiseA":
+            self.encoder = BitwiseEncoder(config)
+        elif config.hash_mode == "bitwiseB":
+            self.encoder = BitwiseEncoder2(config)
+        elif config.hash_mode == "bitwiseC":
+            self.encoder = BitwiseEncoder2(config, include_image=True)
+        else:
+            self.encoder = Encoder(config)
+
+        self.noiser = noiser
+        # self.decoder = Decoder(config)
+        self.decoder = BitwiseDecoder(config)
 
     def forward(self, image, message):
         encoded_image = self.encoder(image, message)

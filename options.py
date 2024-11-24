@@ -7,7 +7,7 @@ class TrainingOptions:
                  batch_size: int,
                  number_of_epochs: int,
                  train_folder: str, validation_folder: str, runs_folder: str,
-                 start_epoch: int, experiment_name: str):
+                 start_epoch: int, experiment_name: str,):
         self.batch_size = batch_size
         self.number_of_epochs = number_of_epochs
         self.train_folder = train_folder
@@ -31,6 +31,9 @@ class HiDDenConfiguration():
                  decoder_loss: float,
                  encoder_loss: float,
                  adversarial_loss: float,
+                 mask,
+                 hash_mode,
+                 masking_args,
                  enable_fp16: bool = False):
         self.H = H
         self.W = W
@@ -47,3 +50,6 @@ class HiDDenConfiguration():
         self.encoder_loss = encoder_loss
         self.adversarial_loss = adversarial_loss
         self.enable_fp16 = enable_fp16
+        self.mask = mask
+        self.hash_mode = hash_mode
+        self.masking_args = masking_args
