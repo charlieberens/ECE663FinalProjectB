@@ -127,18 +127,20 @@ def load_options(options_file_name) -> (TrainingOptions, HiDDenConfiguration, di
 def get_data_loaders(hidden_config: HiDDenConfiguration, train_options: TrainingOptions):
     """ Get torch data loaders for training and validation. The data loaders take a crop of the image,
     transform it into tensor, and normalize it."""
-    if hidden_config.hash_mode=="bitwise":
+    if hidden_config.hash_mode.startswith("bitwise"):
         # If we are doing bitwise transformations, normalization needs to happen after rounding
         data_transforms = {
             'train': transforms.Compose([
                 transforms.Resize(hidden_config.W),
                 transforms.RandomCrop((hidden_config.H, hidden_config.W), pad_if_needed=True),
                 transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
             ]),
             'test': transforms.Compose([
                 transforms.Resize(hidden_config.W),
                 transforms.CenterCrop((hidden_config.H, hidden_config.W)),
                 transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
             ])
         }
     else:

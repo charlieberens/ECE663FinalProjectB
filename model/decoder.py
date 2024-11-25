@@ -12,22 +12,31 @@ class Decoder(nn.Module):
     such as Crop, JpegCompression, and so on. See Noise layers for more.
     """
     def __init__(self, config: HiDDenConfiguration):
-
         super(Decoder, self).__init__()
         self.channels = config.decoder_channels
+
+        if config.split_image_into_16x16_blocks:
+            message_length = config.message_block_length
+            self.H = 16
+            self.W = 16
+            self.mask = None
+        else:
+            message_length = config.message_length
+            self.H = config.H
+            self.W = config.W
+            self.mask = config.mask.cuda()
 
         layers = [ConvBNRelu(3, self.channels)]
         for _ in range(config.decoder_blocks - 1):
             layers.append(ConvBNRelu(self.channels, self.channels))
 
         # layers.append(block_builder(self.channels, config.message_length))
-        layers.append(ConvBNRelu(self.channels, config.message_length))
+        layers.append(ConvBNRelu(self.channels, message_length))
 
         layers.append(nn.AdaptiveAvgPool2d(output_size=(1, 1)))
         self.layers = nn.Sequential(*layers)
 
-        self.linear = nn.Linear(config.message_length, config.message_length)
-        self.mask = config.mask.cuda()
+        self.linear = nn.Linear(message_length, message_length)
 
     def forward(self, image_with_wm):
         if self.mask != None:
@@ -50,18 +59,28 @@ class BitwiseDecoder(nn.Module):
         super(BitwiseDecoder, self).__init__()
         self.channels = config.decoder_channels
 
+        if config.split_image_into_16x16_blocks:
+            message_length = config.message_block_length
+            self.H = 16
+            self.W = 16
+            self.mask = None
+        else:
+            message_length = config.message_length
+            self.H = config.H
+            self.W = config.W
+            self.mask = config.mask.cuda()
+
         layers = [ConvBNRelu(3, self.channels)]
         for _ in range(config.decoder_blocks - 1):
             layers.append(ConvBNRelu(self.channels, self.channels))
 
         # layers.append(block_builder(self.channels, config.message_length))
-        layers.append(ConvBNRelu(self.channels, config.message_length))
+        layers.append(ConvBNRelu(self.channels, message_length))
 
         layers.append(nn.AdaptiveAvgPool2d(output_size=(1, 1)))
         self.layers = nn.Sequential(*layers)
 
-        self.linear = nn.Linear(config.message_length, config.message_length)
-        self.mask = config.mask.cuda()
+        self.linear = nn.Linear(message_length, message_length)
         self.num_bits = int(config.masking_args)
         self.int_rounding_factor = 2**self.num_bits
 

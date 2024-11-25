@@ -91,9 +91,11 @@ class Hidden:
             if self.vgg_loss == None:
                 g_loss_enc = self.mse_loss(encoded_images, images.float())
             else:
-                vgg_on_cov = self.vgg_loss(images)
-                vgg_on_enc = self.vgg_loss(encoded_images)
-                g_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc.float())
+                # vgg_on_cov = self.vgg_loss(images)
+                # vgg_on_enc = self.vgg_loss(encoded_images)
+                # vgg_on_enc = self.vgg_loss(noised_images)
+                # g_loss_enc = self.mse_loss(vgg_on_cov, vgg_on_enc.float())
+                g_loss_enc = self.mse_loss(images, encoded_images)
 
             g_loss_dec = self.mse_loss(decoded_messages, messages.float())
             g_loss = self.config.adversarial_loss * g_loss_adv + self.config.encoder_loss * g_loss_enc \

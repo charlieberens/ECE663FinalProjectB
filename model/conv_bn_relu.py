@@ -9,7 +9,7 @@ class ConvBNRelu(nn.Module):
         super(ConvBNRelu, self).__init__()
         
         self.layers = nn.Sequential(
-            nn.Conv2d(channels_in, channels_out, 3, stride, padding=1),
+            nn.Conv2d(channels_in, channels_out, 3, stride, padding="same"),
             nn.BatchNorm2d(channels_out),
             nn.ReLU(inplace=True)
         )

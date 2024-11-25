@@ -4,6 +4,7 @@ import torch.nn as nn
 from options import HiDDenConfiguration
 from model.conv_bn_relu import ConvBNRelu
 from torchvision import transforms
+from torchvision.utils import save_image
 
 class Encoder(nn.Module):
     """
@@ -11,12 +12,19 @@ class Encoder(nn.Module):
     """
     def __init__(self, config: HiDDenConfiguration):
         super(Encoder, self).__init__()
-        self.H = config.H
-        self.W = config.W
         self.conv_channels = config.encoder_channels
         self.num_blocks = config.encoder_blocks
 
-        self.mask = config.mask.cuda()
+        if config.split_image_into_16x16_blocks:
+            message_length = config.message_block_length
+            self.H = 16
+            self.W = 16
+            self.mask = None
+        else:
+            message_length = config.message_length
+            self.H = config.H
+            self.W = config.W
+            self.mask = config.mask.cuda()
 
         layers = [ConvBNRelu(3, self.conv_channels)]
 
@@ -25,14 +33,13 @@ class Encoder(nn.Module):
             layers.append(layer)
 
         self.conv_layers = nn.Sequential(*layers)
-        self.after_concat_layer = ConvBNRelu(self.conv_channels + 3 + config.message_length,
+        self.after_concat_layer = ConvBNRelu(self.conv_channels + 3 + message_length,
                                              self.conv_channels)
 
         self.final_layer = nn.Conv2d(self.conv_channels, 3, kernel_size=1)
 
 
     def forward(self, image, message):
-
         # First, add two dummy dimensions in the end of the message.
         # This is required for the .expand to work correctly
         expanded_message = message.unsqueeze(-1)
@@ -56,10 +63,17 @@ class BitwiseEncoder(nn.Module):
     """
     def __init__(self, config: HiDDenConfiguration):
         super(BitwiseEncoder, self).__init__()
-        self.H = config.H
-        self.W = config.W
         self.conv_channels = config.encoder_channels
         self.num_blocks = config.encoder_blocks
+
+        if config.split_image_into_16x16_blocks:
+            message_length = config.message_block_length
+            self.H = 16
+            self.W = 16
+        else:
+            message_length = config.message_length
+            self.H = config.H
+            self.W = config.W
 
         layers = [ConvBNRelu(3, self.conv_channels)]
 
@@ -68,7 +82,7 @@ class BitwiseEncoder(nn.Module):
             layers.append(layer)
 
         self.conv_layers = nn.Sequential(*layers)
-        self.after_concat_layer = ConvBNRelu(self.conv_channels + 3 + config.message_length,
+        self.after_concat_layer = ConvBNRelu(self.conv_channels + 3 + message_length,
                                              self.conv_channels)
         self.final_layer = nn.Conv2d(self.conv_channels, 3, kernel_size=1)
         self.num_bits = int(config.masking_args)
@@ -116,10 +130,17 @@ class BitwiseEncoder2(nn.Module):
     """
     def __init__(self, config: HiDDenConfiguration, include_image=False):
         super(BitwiseEncoder2, self).__init__()
-        self.H = config.H
-        self.W = config.W
         self.conv_channels = config.encoder_channels
         self.num_blocks = config.encoder_blocks
+
+        if config.split_image_into_16x16_blocks:
+            message_length = config.message_block_length
+            self.H = 16
+            self.W = 16
+        else:
+            message_length = config.message_length
+            self.H = config.H
+            self.W = config.W
 
         layers = [ConvBNRelu(3, self.conv_channels)]
 
@@ -130,11 +151,11 @@ class BitwiseEncoder2(nn.Module):
         self.conv_layers = nn.Sequential(*layers)
         if include_image:
             self.after_concat_layer = ConvBNRelu(
-                self.conv_channels + 6 + config.message_length,
+                self.conv_channels + 6 + message_length,
                                                 self.conv_channels)
         else:
             self.after_concat_layer = ConvBNRelu(
-                self.conv_channels + 3 + config.message_length,
+                self.conv_channels + 3 + message_length,
                                                 self.conv_channels)
         self.final_layer = nn.Conv2d(self.conv_channels, 3, kernel_size=1)
         self.num_bits = int(config.masking_args)
@@ -151,6 +172,7 @@ class BitwiseEncoder2(nn.Module):
             [.5, .5, .5],
             [root_one_twelveth, root_one_twelveth, root_one_twelveth]
         )
+        # TODO - This is wrong
         self.undo_bit_norm = transforms.Normalize(
             [-.5, -.5, -.5],
             [1/root_one_twelveth, 1/root_one_twelveth, 1/root_one_twelveth]
@@ -158,10 +180,14 @@ class BitwiseEncoder2(nn.Module):
         self.img_norm = transforms.Normalize(
             [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
         )
+        self.inv_img_norm = transforms.Normalize(
+            [-1, -1, -1], [2, 2, 2]
+        )
 
     def forward(self, image, message):
         # NOTE - This image must be unnormalized
         # Set the last self.num_bits to 0
+        image = self.inv_img_norm(image)
         rounded_down_image = torch.floor(image * 256 / self.int_rounding_factor) * self.int_rounding_factor / 256
         last_few_bits = image - rounded_down_image
 
@@ -188,6 +214,7 @@ class BitwiseEncoder2(nn.Module):
         im_w_diff = torch.nn.functional.sigmoid(self.bit_change_temp * im_w_diff_val)
 
         im_w = rounded_down_image + self.output_scaling_factor * im_w_diff
+        im_w = self.img_norm(im_w)
 
         return im_w
     

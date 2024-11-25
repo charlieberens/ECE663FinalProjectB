@@ -34,6 +34,9 @@ class HiDDenConfiguration():
                  mask,
                  hash_mode,
                  masking_args,
+                 split_image_into_16x16_blocks,
+                 message_block_length,
+                 batch_size,
                  enable_fp16: bool = False):
         self.H = H
         self.W = W
@@ -53,3 +56,6 @@ class HiDDenConfiguration():
         self.mask = mask
         self.hash_mode = hash_mode
         self.masking_args = masking_args
+        self.split_image_into_16x16_blocks = split_image_into_16x16_blocks
+        self.message_block_length = message_block_length
+        self.batch_size = batch_size

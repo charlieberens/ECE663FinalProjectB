@@ -46,6 +46,10 @@ def main():
                             help='Arbitrary masking-args.')
     new_run_parser.add_argument('--hash-mode', required=True, type=str,
                             help='bitwise or alternate.')
+    new_run_parser.add_argument('--split-image', action="store_true",
+                            help='Whether to split image into 16x16 blocks')
+    new_run_parser.add_argument('--message-block-length', type=int,
+                            help='Size of split image message block')    
 
     new_run_parser.set_defaults(tensorboard=False)
     new_run_parser.set_defaults(enable_fp16=False)
@@ -89,7 +93,7 @@ def main():
             number_of_epochs=args.epochs,
             train_folder=(os.path.join(args.data_dir, 'train') if args.data_dir else None),
             validation_folder=(os.path.join(args.data_dir, 'val') if args.data_dir else None),
-            runs_folder=os.path.join('.', 'runs'),
+            runs_folder=os.path.join('../', 'runs'),
             start_epoch=start_epoch,
             experiment_name=args.name)
         
@@ -115,13 +119,17 @@ def main():
                                             use_discriminator=True,
                                             use_vgg=False,
                                             discriminator_blocks=3, discriminator_channels=64,
-                                            decoder_loss=1,
-                                            encoder_loss=0.7,
-                                            adversarial_loss=1e-3,
+                                            decoder_loss=.6,
+                                            encoder_loss=10,
+                                            adversarial_loss=1e-2,
+                                            # adversarial_loss=1e-3,
                                             enable_fp16=args.enable_fp16,
                                             mask=watermark_mask,
                                             hash_mode=args.hash_mode,
-                                            masking_args=args.masking_args
+                                            masking_args=args.masking_args,
+                                            split_image_into_16x16_blocks=args.split_image,
+                                            message_block_length=args.message_block_length,
+                                            batch_size=args.batch_size,
                                             )
 
         this_run_folder = utils.create_folder_for_run(train_options.runs_folder, args.name)
