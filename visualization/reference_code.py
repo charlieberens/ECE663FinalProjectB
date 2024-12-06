@@ -26,6 +26,7 @@ def main():
 
     norm = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     
+    # NOTE: Files are named 0,1,2,...,n.pkl
     for file in os.listdir(original_image_path):
         # Load each variant, and combine them into a single tensor
         variant_tensors = [vit_transform(norm(torch.load(os.path.join(variant_path, file)))) for variant_path in [original_image_path] + variant_paths]
