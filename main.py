@@ -50,6 +50,7 @@ def main():
                             help='Whether to split image into 16x16 blocks')
     new_run_parser.add_argument('--message-block-length', type=int,
                             help='Size of split image message block')    
+    new_run_parser.add_argument('--encoder-coeff', required=False, type=float, default=.7)
 
     new_run_parser.set_defaults(tensorboard=False)
     new_run_parser.set_defaults(enable_fp16=False)
@@ -119,9 +120,9 @@ def main():
                                             use_discriminator=True,
                                             use_vgg=False,
                                             discriminator_blocks=3, discriminator_channels=64,
-                                            decoder_loss=.6,
-                                            encoder_loss=10,
-                                            adversarial_loss=1e-2,
+                                            decoder_loss=1,
+                                            encoder_loss=args.encoder_coeff,
+                                            adversarial_loss=1e-3,
                                             # adversarial_loss=1e-3,
                                             enable_fp16=args.enable_fp16,
                                             mask=watermark_mask,

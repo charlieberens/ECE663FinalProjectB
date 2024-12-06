@@ -68,7 +68,7 @@ def main():
 
     compresion_levels = [95, 90, 80]
     noise_magnitude = 0.01
-    noise_magnitudes = [0.01, 0.02, 0.05]
+    noise_magnitudes = [0.025, 0.05, .1]
 
     norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
@@ -136,6 +136,13 @@ def main():
         "different_distances": different_distances
     }
 
+    for i in range(len(noise_magnitudes)):
+        print(f"Mean Noise Distance: ({noise_magnitudes[i]}): {np.mean(noise_distances[i])}")
+        # Get the percentage of noise distances that are less than 0.0002
+        print(f"Percentage of noise distances less than 0.0002: ({noise_magnitudes[i]}): {len([dist for dist in noise_distances[i] if dist < 0.0002]) / len(noise_distances[i])}")
+        # Get the percentage of noise distances that are less than 0.00035
+        print(f"Percentage of noise distances less than 0.00035: ({noise_magnitudes[i]}): {len([dist for dist in noise_distances[i] if dist < 0.00035]) / len(noise_distances[i])}")
+
     torch.save(obj_of_the_things, "temp.pth")
 
     # Plot the distribution of different_distances
@@ -180,8 +187,8 @@ def main():
             all_images = torch.cat([a_images, b_images], dim=0)
 
             # Remove the last 4 bits from the iamge
-            all_images = (all_images * 255).int() / 16
-            all_images = all_images.float() / 16
+            # all_images = (all_images * 255).int() / 16
+            # all_images = all_images.float() / 16
 
             # Save all images
             # save_image(all_images, f"temp.jpg")

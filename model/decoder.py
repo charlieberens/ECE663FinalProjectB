@@ -69,7 +69,7 @@ class BitwiseDecoder(nn.Module):
             self.H = config.H
             self.W = config.W
             self.mask = config.mask.cuda()
-
+        
         layers = [ConvBNRelu(3, self.channels)]
         for _ in range(config.decoder_blocks - 1):
             layers.append(ConvBNRelu(self.channels, self.channels))

@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+import pprint
 import numpy as np
 from torchvision import datasets, transforms
 import torchvision
@@ -62,6 +63,16 @@ def jpeg_compress_tensor_multiple(tensors: torch.Tensor, quality: int = 75) -> t
     """
     return torch.stack([jpeg_compress_tensor(t, quality) for t in tensors])
 
+# def get_hidden_model(checkpoint_file):
+#     train_options, hidden_config, noise_config = utils.load_options("options-and-config.pickle")
+#     noiser = Noiser(noise_config)
+
+#     checkpoint = torch.load(checkpoint_file)
+#     hidden_net = Hidden(hidden_config, "cuda", noiser, None)
+#     utils.model_from_checkpoint(hidden_net, checkpoint)
+
+#     return hidden_net.encoder_decoder.encoder
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data_dir", type=str)
@@ -81,19 +92,21 @@ def main():
         transforms.Resize(256),
         transforms.CenterCrop((256, 256)),
         transforms.ToTensor(),
-        # norm
+        norm
     ]))
     
     vit_transform = transforms.Compose([
+            # Convert to PIL
+            transforms.ToPILImage(),
             transforms.Resize(224),
             transforms.RandomCrop((224, 224), pad_if_needed=True),
             transforms.ToTensor(),
         ])
     vit = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights.DEFAULT)
     
-    train_loader = torch.utils.data.DataLoader(train_images, batch_size=8, shuffle=True,
+    train_loader = torch.utils.data.DataLoader(train_images, batch_size=1, shuffle=True,
                                                num_workers=2)
-    val_loader = torch.utils.data.DataLoader(val_images, batch_size=8, shuffle=False, 
+    val_loader = torch.utils.data.DataLoader(val_images, batch_size=1, shuffle=False, 
                                                 num_workers=2)
 
     # Set up all the hasing we're doing
@@ -101,8 +114,8 @@ def main():
     iv = os.urandom(16)
 
     # Print key and iv as hex strings
-    print(f"Key: {aes_key.hex()}")
-    print(f"IV: {iv.hex()}")
+    # print(f"Key: {aes_key.hex()}")
+    # print(f"IV: {iv.hex()}")
 
     cipher = Cipher(algorithms.AES(aes_key), modes.CFB(iv))
     encryptor = cipher.encryptor()
@@ -117,8 +130,8 @@ def main():
     )
     private_key = public_key.public_key()
 
-    print(f"Private key: {private_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)}")
-    print(f"Public key: {public_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())}")
+    # print(f"Private key: {private_key.public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)}")
+    # print(f"Public key: {public_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())}")
 
     # Concatenate the AES key, with the IV, with a string "GIBBON"
     concatenated = aes_key + iv + b"GIBBON"
@@ -142,36 +155,48 @@ def main():
             label=None
         )
     )
-    print(f"Decrypted AES key: {decrypted_aes_key}")
+    # print(f"Decrypted AES key: {decrypted_aes_key}")
 
     # Set up the encoder decoder
     device = "cuda"
-    this_run_folder = args.model_path
-    options_file = os.path.join(this_run_folder, 'options-and-config.pickle')
-    train_options, hidden_config, noise_config = utils.load_options(options_file)
-    checkpoint, loaded_checkpoint_file_name = utils.load_last_checkpoint(os.path.join(this_run_folder, 'checkpoints'))
-    train_options.start_epoch = checkpoint['epoch'] + 1
-    train_options.train_folder = os.path.join(args.data_dir, 'train')
-    train_options.validation_folder = os.path.join(args.data_dir, 'val')
+    # this_run_folder = args.model_path
+    # options_file = os.path.join(this_run_folder, 'options-and-config.pickle')
+    # train_options, hidden_config, noise_config = utils.load_options(options_file)
+    # checkpoint, loaded_checkpoint_file_name = utils.load_last_checkpoint(os.path.join(this_run_folder, 'checkpoints'))
+    # train_options.start_epoch = checkpoint['epoch'] + 1
+    # train_options.train_folder = os.path.join(args.data_dir, 'train')
+    # train_options.validation_folder = os.path.join(args.data_dir, 'val')
 
-    noiser = Noiser(noise_config, device)
-    model = Hidden(hidden_config, device, noiser, None)
-    utils.model_from_checkpoint(model, checkpoint)
+    # noiser = Noiser(noise_config, device)
+    # model = Hidden(hidden_config, device, noiser, None)
+    # utils.model_from_checkpoint(model, checkpoint)
+
+    model = torch.load(args.model_path)
+    hidden_config = model.config
 
     message_length = hidden_config.message_length
     message = torch.randint(0, 2, (message_length,)).float().to(device)
 
     decoder = SplittyDecoderWrapper(model.encoder_decoder, hidden_config)
 
+    pprint.pformat(vars(hidden_config))
+
     error = 0
     tot = 0
 
-    MODE = "JPEG"
+    MODE = "NOISE"
     QUALITY = 100
+    NOISE_AMOUNT = 0.1
+
 
     if MODE == "JPEG":
         print(f"Using JPEG compression with quality {QUALITY}")
+    elif MODE == "NOISE":
+        print(f"Adding noise with amount {NOISE_AMOUNT}")
 
+    val_a = 0
+    val_b = 0
+    tot = 0
     for i, (images, _) in enumerate(val_loader):
         # pre_vit = vit_transform(images)
         # pre_vit = pre_vit.to(device)
@@ -185,16 +210,48 @@ def main():
         encoded_images = model.encoder_decoder(images, messages)[0]
         encoded_images = undo_norm(encoded_images)
 
+        # Remove the last 4 bits from the image
+        encoded_images = (encoded_images * 255).int() / 16
+        encoded_images = encoded_images.float() / 16
+
+        images = (images * 255).int() / 16
+        images = images.float() / 16
+
+        a = vit(vit_transform(encoded_images[0]).unsqueeze(0))
+        b = vit(vit_transform(undo_norm(images)[0]).unsqueeze(0))
+
+        a = a / a.norm()
+        b = b / b.norm()
+
+        l2_dist = torch.nn.functional.mse_loss(a, b)
+
+        print(l2_dist)
+
+        if l2_dist < 0.00035:
+            val_a += 1
+        if l2_dist < 0.0002:
+            val_b += 1
+        tot += 1
+
+        print(f"Val A: {val_a / tot:.4f}")
+        print(f"Val B: {val_b / tot:.4f}")
+
+        continue
+
         if MODE == "JPEG":
-            compressed_images = jpeg_compress_tensor_multiple(
+            processed_image = jpeg_compress_tensor_multiple(
                 encoded_images, quality=QUALITY
             ).cuda()
-            compressed_images = norm(compressed_images)
+            processed_image = norm(processed_image)
             # print(compressed_images[0,0,:5,:5])
             # print(encoded_images[0,0,:5,:5])
             # print((compressed_images - encoded_images).abs().mean())
+        elif MODE == "NOISE":
+            processed_image = images + torch.randn_like(images) * NOISE_AMOUNT
+        else:
+            processed_image = encoded_images
 
-        decoded_messages = decoder(compressed_images)
+        decoded_messages = decoder(processed_image)
         
         diff = torch.abs(message - decoded_messages[0]) > 0.5
         error += diff.sum().item()
@@ -205,4 +262,5 @@ def main():
 
     print(f"Final error rate: {error / tot:.4f}")
 
-main()
+if __name__ == "__main__":
+    main()

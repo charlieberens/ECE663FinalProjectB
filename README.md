@@ -47,3 +47,5 @@ The encoder takes the last n bits as input, and outputs a number between 0 and 1
 #### BitwiseC
 This is the same as bitwiseB but durring the "after concat layer", the model additionally has access to the original image.
 
+> Dropdown Test
+WAHSIKD KASD

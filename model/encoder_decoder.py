@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchvision
 from model.encoder import BitwiseEncoder, BitwiseEncoder2, Encoder
 from model.decoder import BitwiseDecoder, Decoder
 from options import HiDDenConfiguration
@@ -57,21 +58,22 @@ class EncoderDecoder(nn.Module):
     def unsplit_image(self, image, current_batch_size):
         image = image.reshape((current_batch_size, -1, image.shape[1], image.shape[2], image.shape[3]))
         image = image.split(1, dim=1)
-        image = torch.cat([torch.cat(image[n*self.split_amount:(n+1)*self.split_amount], dim=4).squeeze() for n in range(len(image) // self.split_amount)], dim=2)
+        image = torch.cat([torch.cat(image[n*self.split_amount:(n+1)*self.split_amount], dim=4).squeeze(1) for n in range(len(image) // self.split_amount)], dim=2)
         return image
 
     def forward(self, image, message):
         if self.split_image_into_16x16_blocks:
             current_batch_size = image.shape[0]
-            image = self.split_image(image)
+            split_image = self.split_image(image)
             message = message.view((message.shape[0] * (message.shape[1] // self.message_block_length),self.message_block_length))
-            encoded_image = self.encoder(image, message)
+            encoded_image = self.encoder(split_image, message)
             encoded_image = self.unsplit_image(encoded_image, current_batch_size)
+            
             noised_and_cover = self.noiser([encoded_image, image])
             noised_image = noised_and_cover[0]
             
             # Add gaussian noise to the image
-            noised_image = noised_image + torch.randn_like(noised_image) * 0.1
+            noised_image = noised_image + torch.randn_like(noised_image) * 0.025
 
             split_noised_image = self.split_image(noised_image)
             decoded_message = self.decoder(split_noised_image)
