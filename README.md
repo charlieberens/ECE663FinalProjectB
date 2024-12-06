@@ -1,24 +1,11 @@
 ## File Structure
-Up one directory there is a "data" folder `/home/users/cjb131/school/SigningDemo/data`. I'd symlink to this. Let me know if it won't let you let you.
+Up one directory there is a "data" folder `/home/users/cjb131/school/SigningDemo/data`. 
 
 ```
 SigningDemo
  └─── data
  └─── HiDDeN
 ```
-
-## CLIP
-```
-pip install git+https://github.com/openai/CLIP.git
-```
-(If you create from `environment.yml` you might be set).
-
-`CLIP/main.py` doesn't work yet. Do fix.
-
-TODO:
-* Explore how much the CLIP embedding changes under gaussian noise (simulating HiDDeN purturbations) and JPEG compression.
-* Possibly do dimensionality reduction on the CLIP embedding, and explore the same thing in the lower dimensional space.
-
 
 ## Encoding Methods
 ### Alternate
@@ -30,8 +17,6 @@ python main.py new --data-dir ../data/midjourney/ -b 2 -e 300 --name alternate_3
 ```
 
 This will embed a 32 bit mask in every other bit (every 2 bits) of a 512x512 image.
-
-NOTE: Currently buggy and broken. I will fix.
 
 ### Bitwise
 The watermark is embedded in the last n bits of each pixel. `n` is specified by the `--masking-args` argument.
