@@ -10,6 +10,7 @@ from vgg_loss import VGGLoss
 from noise_layers.noiser import Noiser
 from PIL import Image
 from io import BytesIO
+import os
 
 def jpeg_compress_tensor_multiple(tensors: torch.Tensor, quality: int = 75) -> torch.Tensor:
     """
@@ -97,6 +98,8 @@ class Hidden:
 
         self.norm = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
+        self.num = 0
+
         self.tb_logger = tb_logger
         if tb_logger is not None:
             from tensorboard_logger import TensorBoardLogger
@@ -120,7 +123,8 @@ class Hidden:
         self.encoder_decoder.train()
         self.discriminator.train()
 
-        DO_SLOW_EVAL = False
+        DO_SLOW_EVAL = True
+        DO_SAVE_IMAGES = True
 
         with torch.enable_grad():
             # ---------------- Train the discriminator -----------------------------
@@ -143,22 +147,64 @@ class Hidden:
             if DO_SLOW_EVAL:
                 unnorm_encoded_images = (encoded_images + 1) / 2
 
-                compressed_images = jpeg_compress_tensor_multiple(unnorm_encoded_images, quality=75).cuda()
+                compressed_images_100 = jpeg_compress_tensor_multiple(unnorm_encoded_images, quality=100).cuda()
+                compressed_og_images_100 = jpeg_compress_tensor_multiple((images +1) / 2, quality=100).cuda()
 
-                torchvision.utils.save_image((compressed_images * 2) - 1, f"compressed_scaled.png")
-                torchvision.utils.save_image(encoded_images, f"encoded_scaled.png")
+                compressed_images_90 = jpeg_compress_tensor_multiple(unnorm_encoded_images, quality=90).cuda()
+                compressed_og_images_90 = jpeg_compress_tensor_multiple((images +1) / 2, quality=90).cuda()
 
-                compressed_decoded_messages = self.encoder_decoder.decoder(self.encoder_decoder.split_image(compressed_images * 2 -1)).view((images.shape[0], -1))
-                compressed_decoded_messages_mse_loss = self.mse_loss(compressed_decoded_messages, messages.float())
+                compressed_images_75 = jpeg_compress_tensor_multiple(unnorm_encoded_images, quality=75).cuda()
+                compressed_og_images_75 = jpeg_compress_tensor_multiple((images +1) / 2, quality=75).cuda()
 
-                compressed_decoded_rounded = compressed_decoded_messages.detach().cpu().round().clip(0, 1)
-                compressed_bitwise_avg_err_split = torch.sum(torch.abs(compressed_decoded_rounded - messages.detach().cpu()), dim=1) / (messages.shape[1])
-                compressed_bitwise_avg_err = torch.sum(compressed_bitwise_avg_err_split) / batch_size
-                compressed_bitwise_success_rate = torch.sum(compressed_bitwise_avg_err_split < .05) / batch_size
+                if DO_SAVE_IMAGES:
+                    # Make necessary directories
+                    RUN_NUM = 3
+                    os.makedirs(f"../output_images/{RUN_NUM}/unsigned_compressed_75", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/signed_compressed_75", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/unsigned_compressed_90", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/signed_compressed_90", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/unsigned_compressed_100", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/signed_compressed_100", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/original", exist_ok=True)
+                    os.makedirs(f"../output_images/{RUN_NUM}/signed", exist_ok=True)
+
+                    for i in range(len(compressed_images_75)):
+                        num = self.num * len(compressed_images_75) + i
+                        # Save images as torch tensors. Not images.
+                        torch.save(compressed_og_images_75[i], f"../output_images/{RUN_NUM}/unsigned_compressed_75/{num}.pkl")
+                        torch.save(compressed_images_75[i], f"../output_images/{RUN_NUM}/signed_compressed_75/{num}.pkl")
+                        torch.save(compressed_og_images_90[i], f"../output_images/{RUN_NUM}/unsigned_compressed_90/{num}.pkl")
+                        torch.save(compressed_images_90[i], f"../output_images/{RUN_NUM}/signed_compressed_90/{num}.pkl")
+                        torch.save(compressed_og_images_100[i], f"../output_images/{RUN_NUM}/unsigned_compressed_100/{num}.pkl")
+                        torch.save(compressed_images_100[i], f"../output_images/{RUN_NUM}/signed_compressed_100/{num}.pkl")
+                        torch.save((images[i] + 1) / 2, f"../output_images/{RUN_NUM}/original/{num}.pkl")
+                        torch.save((encoded_images[i] + 1) / 2, f"../output_images/{RUN_NUM}/signed/{num}.pkl")
+
+                    self.num += 1
+
+                # torchvision.utils.save_image((compressed_images * 2) - 1, f"compressed_scaled.png")
+                # torchvision.utils.save_image(encoded_images, f"encoded_scaled.png")
+
+                compressed_decoded_messages_75 = self.encoder_decoder.decoder(self.encoder_decoder.split_image((compressed_images_75 * 2) - 1)).view((images.shape[0], -1))
+                compressed_decoded_rounded_75 = compressed_decoded_messages_75.detach().cpu().round().clip(0, 1)
+                compressed_bitwise_avg_err_split_75 = torch.sum(torch.abs(compressed_decoded_rounded_75 - messages.detach().cpu()), dim=1) / (messages.shape[1])
+                compressed_bitwise_avg_err_75 = torch.sum(compressed_bitwise_avg_err_split_75) / batch_size
+                compressed_bitwise_success_rate_75 = torch.sum(compressed_bitwise_avg_err_split_75 < .05) / batch_size
+
+                compressed_decoded_messages_90 = self.encoder_decoder.decoder(self.encoder_decoder.split_image((compressed_images_90 * 2) - 1)).view((images.shape[0], -1))
+                compressed_decoded_rounded_90 = compressed_decoded_messages_90.detach().cpu().round().clip(0, 1)
+                compressed_bitwise_avg_err_split_90 = torch.sum(torch.abs(compressed_decoded_rounded_90 - messages.detach().cpu()), dim=1) / (messages.shape[1])
+                compressed_bitwise_avg_err_90 = torch.sum(compressed_bitwise_avg_err_split_90) / batch_size
+                compressed_bitwise_success_rate_90 = torch.sum(compressed_bitwise_avg_err_split_90 < .05) / batch_size
+
+                compressed_decoded_messages_100 = self.encoder_decoder.decoder(self.encoder_decoder.split_image((compressed_images_100 * 2) - 1)).view((images.shape[0], -1))
+                compressed_decoded_rounded_100 = compressed_decoded_messages_100.detach().cpu().round().clip(0, 1)
+                compressed_bitwise_avg_err_split_100 = torch.sum(torch.abs(compressed_decoded_rounded_100 - messages.detach().cpu()), dim=1) / (messages.shape[1])
+                compressed_bitwise_avg_err_100 = torch.sum(compressed_bitwise_avg_err_split_100) / batch_size
+                compressed_bitwise_success_rate_100 = torch.sum(compressed_bitwise_avg_err_split_100 < .05) / batch_size
             else:
                 compressed_bitwise_success_rate = torch.tensor(1)
                 compressed_bitwise_avg_err = torch.tensor(1)
-                compressed_decoded_messages_mse_loss = torch.tensor(1)
 
             # compressed_decoded_messages = self.encoder_decoder.decoder(self.encoder_decoder.split_image(noised_images)).view((images.shape[0], -1))
             # compressed_decoded_messages_mse_loss = self.mse_loss(compressed_decoded_messages, messages.float())
@@ -188,11 +234,27 @@ class Hidden:
             split_vit_loss = torch.nn.functional.mse_loss(encoded_embedding, images_embedding, reduction="none").mean(dim=1)
 
             if DO_SLOW_EVAL:
-                compressed_images_embedding = self.vit(self.vit_transform(self.norm(compressed_images)))
-                compressed_images_embedding = torch.nn.functional.normalize(compressed_images_embedding, p=2, dim=1)
-                split_compressed_vit_loss = torch.nn.functional.mse_loss(compressed_images_embedding, images_embedding, reduction="none").mean(dim=1)
-                compressed_count_fine_a = (split_compressed_vit_loss < .00035).sum()
-                compressed_vit_loss = torch.mean(split_compressed_vit_loss)
+                compressed_images_embedding_75 = self.vit(self.vit_transform(self.norm(compressed_images_75)))
+                compressed_images_embedding_75 = torch.nn.functional.normalize(compressed_images_embedding_75, p=2, dim=1)
+                split_compressed_vit_loss_75 = torch.nn.functional.mse_loss(compressed_images_embedding_75, images_embedding, reduction="none").mean(dim=1)
+                compressed_count_fine_a_75 = (split_compressed_vit_loss_75 < .00035).sum()
+                compressed_vit_loss_75 = torch.mean(split_compressed_vit_loss_75)
+
+                compressed_images_embedding_90 = self.vit(self.vit_transform(self.norm(compressed_images_90)))
+                compressed_images_embedding_90 = torch.nn.functional.normalize(compressed_images_embedding_90, p=2, dim=1)
+                split_compressed_vit_loss_90 = torch.nn.functional.mse_loss(compressed_images_embedding_90, images_embedding, reduction="none").mean(dim=1)
+                compressed_count_fine_a_90 = (split_compressed_vit_loss_90 < .00035).sum()
+                compressed_vit_loss_90 = torch.mean(split_compressed_vit_loss_90)
+
+                compressed_images_embedding_100 = self.vit(self.vit_transform(self.norm(compressed_images_100)))
+                compressed_images_embedding_100 = torch.nn.functional.normalize(compressed_images_embedding_100, p=2, dim=1)
+                split_compressed_vit_loss_100 = torch.nn.functional.mse_loss(compressed_images_embedding_100, images_embedding, reduction="none").mean(dim=1)
+                compressed_count_fine_a_100 = (split_compressed_vit_loss_100 < .00035).sum()
+                compressed_vit_loss_100 = torch.mean(split_compressed_vit_loss_100)
+
+                joint_success_100 = torch.logical_and(split_compressed_vit_loss_100.cpu() < .00035, compressed_bitwise_avg_err_split_100 < .05)
+                joint_success_90 = torch.logical_and(split_compressed_vit_loss_90.cpu() < .00035, compressed_bitwise_avg_err_split_90 < .05)
+                joint_success_75 = torch.logical_and(split_compressed_vit_loss_75.cpu() < .00035, compressed_bitwise_avg_err_split_75 < .05)
             else:
                 compressed_vit_loss = 0
                 compressed_count_fine_a = 1
@@ -204,14 +266,14 @@ class Hidden:
             rand = np.random.rand()
 
             # if rand > .9:
-            if DO_SLOW_EVAL:
-                weaved_noised_images_and_images = torch.cat([
-                    (encoded_images + 1) / 2,
-                    (noised_images + 1) / 2,
-                    (images + 1) / 2,
-                    compressed_images], dim=3)
-                # Save weaved_noised_images_and_images
-                torchvision.utils.save_image(weaved_noised_images_and_images, f"weaved_noised_images_and_images-proper-vit-5.png")
+            # if DO_SLOW_EVAL:
+            #     weaved_noised_images_and_images = torch.cat([
+            #         (encoded_images + 1) / 2,
+            #         (noised_images + 1) / 2,
+            #         (images + 1) / 2,
+            #         compressed_images], dim=3)
+            #     # Save weaved_noised_images_and_images
+            #     torchvision.utils.save_image(weaved_noised_images_and_images, f"weaved_noised_images_and_images-proper-vit-5.png")
 
 
             g_loss_dec = self.mse_loss(decoded_messages, messages.float())
@@ -222,9 +284,12 @@ class Hidden:
             g_loss.backward()
             self.optimizer_enc_dec.step()
 
-        decoded_rounded = decoded_messages.detach().cpu().numpy().round().clip(0, 1)
-        bitwise_avg_err = np.sum(np.abs(decoded_rounded - messages.detach().cpu().numpy())) / (
-                batch_size * messages.shape[1])
+        decoded_rounded = decoded_messages.detach().cpu().round().clip(0, 1)
+        bitwise_avg_err_split = torch.sum(torch.abs(decoded_rounded - messages.detach().cpu()), dim=1) / (messages.shape[1])
+        bitwise_avg_err = torch.sum(bitwise_avg_err_split) / batch_size
+        success_rate = torch.sum(bitwise_avg_err_split < .05) / batch_size
+
+        joint_success = torch.logical_and(split_vit_loss.cpu() < .00035, bitwise_avg_err_split < .05)
 
         losses = {
             'loss           ': g_loss.item(),
@@ -235,12 +300,24 @@ class Hidden:
             'discr_cover_bce': d_loss_on_cover.item(),
             'discr_encod_bce': d_loss_on_encoded.item(),
             "vit_loss": vit_loss.item(),
-            "compressed_vit_loss": compressed_vit_loss,
             "vit_count_fine_a": vit_count_fine_a / batch_size,
-            "compressed_count_fine_a": compressed_count_fine_a / batch_size,
-            "compressed_decoded_messages_mse_loss": compressed_decoded_messages_mse_loss,
-            "compressed_bitwise_avg_err": compressed_bitwise_avg_err,
-            "compressed_bitwise_success_rate": compressed_bitwise_success_rate
+            "compressed_count_fine_a_75": compressed_count_fine_a_75 / batch_size,
+            "compressed_vit_loss_75": compressed_vit_loss_75.item(),
+            "compressed_count_fine_a_90": compressed_count_fine_a_90 / batch_size,
+            "compressed_vit_loss_90": compressed_vit_loss_90.item(),
+            "compressed_count_fine_a_100": compressed_count_fine_a_100 / batch_size,
+            "compressed_vit_loss_100": compressed_vit_loss_100.item(),
+            "compressed_bitwise_avg_err_75": compressed_bitwise_avg_err_75.item(),
+            "compressed_bitwise_avg_err_90": compressed_bitwise_avg_err_90.item(),
+            "compressed_bitwise_avg_err_100": compressed_bitwise_avg_err_100.item(),
+            "compressed_bitwise_success_rate_75": compressed_bitwise_success_rate_75.item(),
+            "compressed_bitwise_success_rate_90": compressed_bitwise_success_rate_90.item(),
+            "compressed_bitwise_success_rate_100": compressed_bitwise_success_rate_100.item(),
+            "joint_success_100": joint_success_100.sum().item() / batch_size,
+            "joint_success_90": joint_success_90.sum().item() / batch_size,
+            "joint_success_75": joint_success_75.sum().item() / batch_size,
+            "joint_success": joint_success.sum().item() / batch_size,
+            "success_rate": success_rate.item()            
         }
         return losses, (encoded_images, noised_images, decoded_messages)
 
